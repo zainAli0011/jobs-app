@@ -352,7 +352,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
             style={[styles.footerButton, styles.applyButton, { backgroundColor: colors.tint }]}
             onPress={handleApply}
           >
-            <Text style={styles.applyButtonText}>Apply Filters</Text>
+            <Text style={[styles.applyButtonText, { color: colorScheme === 'dark' ? '#1F2937' : '#FFFFFF' }]}>Apply Filters</Text>
           </TouchableOpacity>
         </View>
       </BlurView>
@@ -505,7 +505,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   applyButtonText: {
-    color: '#1F2937',
     fontSize: 16,
     fontWeight: '500',
   },

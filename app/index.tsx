@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,66 +22,59 @@ import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import Constants from 'expo-constants';
+import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Import services
-import { fetchJobs, fetchCategories, Job, Category } from '../services/api';
+// Import services and context
+import { Job, Category } from '../services/api';
+import { useJobs } from '../contexts/JobsContext';
 
 // Import components
 import { JobCard } from '../components/JobCard';
 import { FilterSheet, FilterOptions } from '../components/FilterSheet';
 
+// Make sure splash screen doesn't auto hide
+SplashScreen.preventAutoHideAsync();
+
 const JobsScreen = () => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
-  // State variables
-  const [jobs, setJobs] = useState<Job[]>([]);
+  // Use the jobs context
+  const { jobs, categories, isLoading, error, refreshJobs, isRefreshing, isOffline } = useJobs();
+  
+  // Local state variables
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({});
   const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Reference to track if this is the first load
+  const isFirstLoad = useRef(true);
 
   // Load data when the screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      if (isFirstLoad.current) {
+        // We don't need to do anything on first load, as data is loaded by JobsContext
+      } else {
+        // On subsequent focuses, we can refresh if needed
+        // You can decide whether to refresh here or not
+      }
     }, [])
   );
 
-  // Load data from API
-  const loadData = async () => {
-    setIsLoading(true);
-    setError(null);
+  // When splash screen should be hidden
+  useEffect(() => {
+    const hideSplash = async () => {
+      if (!isLoading && isFirstLoad.current) {
+        await SplashScreen.hideAsync();
+        isFirstLoad.current = false;
+      }
+    };
     
-    try {
-      // Fetch all data in parallel
-      const [jobsData, categoriesData] = await Promise.all([
-        fetchJobs(),
-        fetchCategories(),
-      ]);
-      
-      setJobs(jobsData.jobs);
-      setFilteredJobs(jobsData.jobs);
-      setCategories(categoriesData);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setError('Failed to load data. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Handle refresh
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await loadData();
-    setIsRefreshing(false);
-  };
+    hideSplash();
+  }, [isLoading]);
 
   // Filter jobs based on search query and filters
   useEffect(() => {
@@ -101,11 +94,7 @@ const JobsScreen = () => {
     
     // Apply filters
     if (filters.category && typeof filters.category === 'string') {
-      const categoryQuery = filters.category.toLowerCase();
-      result = result.filter(job => 
-        job.title.toLowerCase().includes(categoryQuery) || 
-        job.description?.toLowerCase().includes(categoryQuery)
-      );
+      result = result.filter(job => job.category === filters.category);
     }
     
     if (filters.location) {
@@ -135,6 +124,18 @@ const JobsScreen = () => {
   // Handle apply filters
   const handleApplyFilters = (newFilters: FilterOptions) => {
     setFilters(newFilters);
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    await refreshJobs();
+  };
+
+  // Check network and refresh
+  const checkNetworkAndRefresh = async () => {
+    if (!isOffline) {
+      await handleRefresh();
+    }
   };
 
   // Render header
@@ -314,17 +315,36 @@ const JobsScreen = () => {
 
   // Render list of jobs
   const renderContent = () => {
-    if (isLoading) {
+    // For initial load, don't show the loading indicator as the splash screen is visible
+    if (isLoading && jobs.length === 0) {
+      return null; // Return nothing during initial load as splash screen is visible
+    }
+    
+    // Show network error message when offline
+    if (isOffline) {
       return (
         <View style={styles.centeredContainer}>
-          <ActivityIndicator size="large" color={colors.tint} />
+          <FontAwesome5 name="wifi-slash" size={50} color={colors.icon} />
           <Text style={[styles.messageText, { color: colors.text }]}>
-            Loading jobs...
+            No internet connection
           </Text>
+          <Text style={[styles.messageSubtext, { color: colors.icon }]}>
+            Please connect to a network to view jobs
+          </Text>
+          <TouchableOpacity 
+            style={[styles.retryButton, { marginTop: 24 }]}
+            onPress={checkNetworkAndRefresh}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <FontAwesome5 name="sync-alt" size={16} color="#1F2937" style={{ marginRight: 8 }} />
+              <Text style={styles.retryButtonText}>Refresh</Text>
+            </View>
+          </TouchableOpacity>
         </View>
       );
     }
     
+    // Show error message if there's an error and no jobs to display
     if (error && filteredJobs.length === 0) {
       return (
         <View style={styles.centeredContainer}>
@@ -334,7 +354,7 @@ const JobsScreen = () => {
           </Text>
           <TouchableOpacity 
             style={[styles.retryButton]}
-            onPress={loadData}
+            onPress={refreshJobs}
           >
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
@@ -342,6 +362,7 @@ const JobsScreen = () => {
       );
     }
     
+    // No jobs matching filters
     if (filteredJobs.length === 0) {
       return (
         <View style={styles.centeredContainer}>
@@ -383,6 +404,7 @@ const JobsScreen = () => {
           ListHeaderComponent={
             <>
               {renderHeader()}
+              <View style={{ height: 20 }} />
               {renderActiveFilters()}
             </>
           }
@@ -486,6 +508,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 24,
   },
+  messageSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+  },
   retryButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -501,7 +528,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 0,
+    paddingTop: 16,
     paddingBottom: Platform.OS === 'ios' ? 40 : 80,
   },
   activeFiltersContainer: {

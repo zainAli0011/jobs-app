@@ -23,13 +23,17 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Import types
-import { Job, fetchJobById } from '../../../services/api';
+// Import services and context
+import { Job } from '../../../services/api';
+import { useJobs } from '../../../contexts/JobsContext';
 
 export default function ApplyJobScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  
+  // Get access to the jobs context
+  const { getJobById, isOffline, checkNetworkAndRefresh } = useJobs();
   
   // State for job info
   const [job, setJob] = useState<Job | null>(null);
@@ -58,33 +62,22 @@ export default function ApplyJobScreen() {
     setError(null);
 
     try {
-      const jobData = await fetchJobById(id as string);
+      // Use the context method to get the job details from cache if available
+      const jobData = await getJobById(id as string);
       
-      // Ensure job has all required properties with fallbacks
-      const jobWithDefaults = {
-        id: jobData._id || jobData.id || id,
-        title: jobData.title || 'Untitled Position',
-        company: jobData.company || 'Unknown Company',
-        companyLogo: jobData.companyLogo || null,
-        location: jobData.location || 'Location not specified',
-        type: jobData.type || 'Type not specified',
-        salary: jobData.salary || 'Not specified',
-        workplace: jobData.workplace || null,
-        description: jobData.description || 'No description available',
-        requirements: Array.isArray(jobData.requirements) ? jobData.requirements : 
-                     (typeof jobData.requirements === 'string' ? jobData.requirements.split('\n').filter(Boolean) : []),
-        benefits: Array.isArray(jobData.benefits) ? jobData.benefits : 
-                 (typeof jobData.benefits === 'string' ? jobData.benefits.split('\n').filter(Boolean) : []),
-        postedDate: jobData.postedDate || new Date(),
-        featured: !!jobData.featured,
-      };
+      if (!jobData) {
+        throw new Error('Job not found');
+      }
       
-      console.log('Processed job data for apply screen:', JSON.stringify(jobWithDefaults));
-      setJob(jobWithDefaults as Job);
-      setIsLoading(false);
+      setJob(jobData);
     } catch (error) {
       console.error('Error fetching job info:', error);
-      setError(`Failed to load job information. Please try again. ${error instanceof Error ? error.message : ''}`);
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to load job information. Please try again.');
+      }
+    } finally {
       setIsLoading(false);
     }
   };
@@ -190,38 +183,6 @@ export default function ApplyJobScreen() {
     }
   };
 
-  // Render loading state
-  if (isLoading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'right', 'left']}>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.tint} />
-          <Text style={[styles.loadingText, { color: colors.text }]}>Loading application form...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Render error state
-  if (error) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'right', 'left']}>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        <View style={styles.errorContainer}>
-          <FontAwesome5 name="exclamation-circle" size={50} color={colors.icon} />
-          <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
-          <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.tint }]}
-            onPress={fetchJobInfo}
-          >
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   // Render success state
   if (isSubmitted) {
     return (
@@ -242,7 +203,54 @@ export default function ApplyJobScreen() {
               router.push("/");
             }}
           >
-            <Text style={styles.doneButtonText}>Back to Jobs</Text>
+            <Text style={[styles.doneButtonText, { color: colorScheme === 'dark' ? '#1F2937' : '#FFFFFF' }]}>Back to Jobs</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Handle network connectivity error
+  if (isOffline && !job) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'right', 'left']}>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <View style={styles.errorContainer}>
+          <FontAwesome5 name="wifi-slash" size={50} color={colors.icon} />
+          <Text style={[styles.errorText, { color: colors.text }]}>No internet connection</Text>
+          <Text style={[styles.errorSubtext, { color: colors.icon, marginBottom: 24 }]}>
+            Please connect to a network to apply for this job
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.tint }]}
+            onPress={async () => {
+              await checkNetworkAndRefresh();
+              fetchJobInfo();
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <FontAwesome5 name="sync-alt" size={16} color={colorScheme === 'dark' ? '#1F2937' : '#FFFFFF'} style={{ marginRight: 8 }} />
+              <Text style={[styles.retryButtonText, { color: colorScheme === 'dark' ? '#1F2937' : '#FFFFFF' }]}>Refresh</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Only show error state if there's an error and no job data
+  if (error && !job) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'right', 'left']}>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <View style={styles.errorContainer}>
+          <FontAwesome5 name="exclamation-circle" size={50} color={colors.icon} />
+          <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.tint }]}
+            onPress={fetchJobInfo}
+          >
+            <Text style={[styles.retryButtonText, { color: colorScheme === 'dark' ? '#1F2937' : '#FFFFFF' }]}>Try Again</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -280,21 +288,23 @@ export default function ApplyJobScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Job info section */}
-          <View style={styles.jobInfoSection}>
-            <Text style={[styles.jobTitle, { color: colors.text }]}>{job?.title}</Text>
-            <Text style={[styles.jobCompany, { color: colors.icon }]}>
-              {job?.company}
-              {job?.location ? (
-                <>
-                  <Text style={{ color: colors.icon }}> • </Text>
-                  <Text style={{ color: colors.icon }}>{job?.location}</Text>
-                </>
-              ) : null}
-            </Text>
-          </View>
+          {/* Job info section - conditionally render when job data is available */}
+          {job && (
+            <View style={styles.jobInfoSection}>
+              <Text style={[styles.jobTitle, { color: colors.text }]}>{job?.title}</Text>
+              <Text style={[styles.jobCompany, { color: colors.icon }]}>
+                {job?.company}
+                {job?.location ? (
+                  <>
+                    <Text style={{ color: colors.icon }}> • </Text>
+                    <Text style={{ color: colors.icon }}>{job?.location}</Text>
+                  </>
+                ) : null}
+              </Text>
+            </View>
+          )}
           
-          {/* Form section */}
+          {/* Form section - always show the form section */}
           <View style={styles.formSection}>
             {/* Email */}
             <View style={styles.inputGroup}>
@@ -399,18 +409,19 @@ export default function ApplyJobScreen() {
         styles.submitContainer,
         { backgroundColor: colorScheme === 'dark' ? colors.background : '#FFFFFF' }
       ]}>
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            { backgroundColor: isSubmitting ? '#818CF8' : colors.tint },
-          ]}
+        <TouchableOpacity 
+          style={[styles.submitButton, { 
+            backgroundColor: isLoading || !job ? colors.icon : 
+                             isSubmitting ? colors.icon : colors.tint,
+            opacity: isLoading || !job ? 0.7 : 1,
+          }]} 
           onPress={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isLoading || !job}
         >
           {isSubmitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={colorScheme === 'dark' ? '#1F2937' : '#FFFFFF'} />
           ) : (
-            <Text style={styles.submitButtonText}>Apply</Text>
+            <Text style={[styles.submitButtonText, { color: colorScheme === 'dark' ? '#1F2937' : '#FFFFFF' }]}>Apply</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -455,23 +466,29 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 24,
   },
   errorText: {
-    color: '#FF4D4F',
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 18,
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  errorSubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginHorizontal: 24,
   },
   retryButton: {
-    marginTop: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
+    marginTop: 16,
   },
   retryButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: 'bold',
   },
   scrollView: {
     flex: 1,
@@ -572,7 +589,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   submitButtonText: {
-    color: '#1F2937',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -605,7 +621,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   doneButtonText: {
-    color: '#1F2937',
     fontSize: 16,
     fontWeight: 'bold',
   },

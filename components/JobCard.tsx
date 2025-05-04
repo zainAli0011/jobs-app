@@ -217,7 +217,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onPress }) => {
           style={[styles.button, styles.applyButton, { backgroundColor: colors.tint }]} 
           onPress={handleApplyNow}
         >
-          <Text style={styles.applyButtonText}>Apply Now</Text>
+          <Text style={[styles.applyButtonText, { color: colorScheme === 'dark' ? '#1F2937' : '#FFFFFF' }]}>Apply Now</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -345,7 +345,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   applyButtonText: {
-    color: '#1F2937',
     fontWeight: '500',
     fontSize: 14,
   },
