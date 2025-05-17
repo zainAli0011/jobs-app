@@ -1,3 +1,4 @@
+import { registerForPushNotificationsAsync, handleNotification, handleNotificationResponse } from '../services/notification';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -24,7 +25,7 @@ import { BlurView } from 'expo-blur';
 import Constants from 'expo-constants';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import * as Notifications from 'expo-notifications';
 // Import services and context
 import { Job, Category } from '../services/api';
 import { useJobs } from '../contexts/JobsContext';
@@ -35,6 +36,14 @@ import { FilterSheet, FilterOptions } from '../components/FilterSheet';
 
 // Make sure splash screen doesn't auto hide
 SplashScreen.preventAutoHideAsync();
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 const JobsScreen = () => {
   const colorScheme = useColorScheme();
@@ -49,8 +58,57 @@ const JobsScreen = () => {
   const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Notification state
+  const [expoPushToken, setExpoPushToken] = useState<string>('');
+  const [notification, setNotification] = useState<Notifications.Notification | null>(null);
+  const notificationListener = useRef<Notifications.Subscription>();
+  const responseListener = useRef<Notifications.Subscription>();
+  
   // Reference to track if this is the first load
   const isFirstLoad = useRef(true);
+
+  // Set up notifications when component mounts
+  useEffect(() => {
+    // Register for push notifications
+    registerForPushNotificationsAsync()
+      .then(token => {
+        if (token) {
+          setExpoPushToken(token);
+        }
+      })
+      .catch(error => {
+        console.log('Error getting push token:', error);
+      });
+
+    // Set up notification listeners
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      setNotification(notification);
+      handleNotification(notification);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notification tapped:', response);
+      const result = handleNotificationResponse(response);
+      
+      // Handle navigation based on notification type
+      if (result && result.type === 'job' && result.id) {
+        router.push({
+          pathname: "/jobs/[id]",
+          params: { id: result.id }
+        });
+      }
+    });
+
+    // Clean up listeners on unmount
+    return () => {
+      if (notificationListener.current) {
+        notificationListener.current.remove();
+      }
+      if (responseListener.current) {
+        responseListener.current.remove();
+      }
+    };
+  }, []);
 
   // Load data when the screen comes into focus
   useFocusEffect(

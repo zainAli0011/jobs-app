@@ -14,9 +14,11 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": 
+        "#ffffff"
       },
-      "package": "com.anonymous.jobfindermobile"
+      "package": "com.anonymous.jobfindermobile",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -45,6 +47,7 @@
       "eas": {
         "projectId": "32a21d2a-8e0c-413b-b69e-4c31a471a5ca"
       }
-    }
+    },
+    "owner": "zainali950"
   }
 }

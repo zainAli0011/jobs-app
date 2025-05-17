@@ -8,7 +8,7 @@ import { Colors } from '../constants/Colors';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { JobsProvider } from '../contexts/JobsContext';
 
-SplashScreen.preventAutoHideAsync();
+// SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
