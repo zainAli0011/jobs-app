@@ -1,0 +1,17 @@
+[
+  "react-native-google-mobile-ads",
+  {
+    "androidAppId": "ca-app-pub-9773068853653447~1012171054",
+    "userTrackingDescription": "This identifier will be used to deliver personalized ads to you."
+  }
+]
+
+
+      "permissions": [
+        "com.google.android.gms.permission.AD_ID"
+      ],
+
+
+
+
+      

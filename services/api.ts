@@ -156,59 +156,21 @@ const getMockJobById = (id: string): Job => {
 /**
  * Fetch all jobs from the API
  */
-export const fetchJobs = async (
-  filters?: {
-    search?: string;
-    category?: string;
-    location?: string;  // This will now be a text search query for location
-    type?: string;
-    featured?: boolean;
-    page?: number;
-    limit?: number;
-  }
-): Promise<{ jobs: Job[]; totalJobs: number }> => {
+export const fetchJobs = async (): Promise<{ jobs: Job[]; total: number }> => {
   try {
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    
-    if (filters) {
-      if (filters.search) queryParams.append('search', filters.search);
-      if (filters.category) queryParams.append('category', filters.category);
-      if (filters.location) queryParams.append('location', filters.location);
-      if (filters.type) queryParams.append('type', filters.type);
-      if (filters.featured) queryParams.append('featured', 'true');
-      if (filters.page) queryParams.append('page', filters.page.toString());
-      if (filters.limit) queryParams.append('limit', filters.limit.toString());
-    }
-
-    const apiUrl = getApiUrl();
-    const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-    const response = await fetch(`${apiUrl}/jobs${query}`);
+    console.log('Fetching all jobs from API...');
+    const response = await fetch(`${API_URL}/jobs`);
     
     if (!response.ok) {
-      throw new Error(`Failed to fetch jobs: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     const data = await response.json();
-    return {
-      jobs: data.jobs.map((job: any) => ({
-        ...job,
-        id: job._id || job.id, // Ensure we have an id property
-      })),
-      totalJobs: data.totalJobs || data.jobs.length,
-    };
-  } catch (error: any) {
+    console.log(`Fetched ${data.jobs.length} jobs from API`);
+    return data;
+  } catch (error) {
     console.error('Error fetching jobs:', error);
-    
-    // Return mock jobs in development or when API is unavailable
-    if (__DEV__ || (error.toString && error.toString().includes('Network request failed'))) {
-      console.log('Returning mock jobs...');
-      const mockJobs = Array(10).fill(0).map((_, index) => getMockJobById(`job-${index}`));
-      return { jobs: mockJobs, totalJobs: mockJobs.length };
-    }
-    
-    Alert.alert('Error', 'Failed to fetch jobs. Please try again later.');
-    return { jobs: [], totalJobs: 0 };
+    throw error;
   }
 };
 

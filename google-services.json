@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "571167638892",
-    "project_id": "jobs-app-b96f1",
-    "storage_bucket": "jobs-app-b96f1.firebasestorage.app"
+    "project_number": "1035136136657",
+    "project_id": "jobs-app-mobile",
+    "storage_bucket": "jobs-app-mobile.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:571167638892:android:ba858ba2e771ae5914df49",
+        "mobilesdk_app_id": "1:1035136136657:android:824eb910a1fdbbfe7d9cf0",
         "android_client_info": {
           "package_name": "com.anonymous.jobfindermobile"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBvFofsYX4D0P0mgNnSk3hnJhURTMIrD98"
+          "current_key": "AIzaSyAh7cSP8Rs0Z8FtohYH2uNLW7F_OjdG3vQ"
         }
       ],
       "services": {

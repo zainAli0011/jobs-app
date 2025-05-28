@@ -24,11 +24,19 @@ import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Import services and context
-import { Job } from '../../../services/api';
+import { Job, fetchJobById } from '../../../services/api';
 import { useJobs } from '../../../contexts/JobsContext';
 
 export default function ApplyJobScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // Get all available params from notification or regular navigation
+  const params = useLocalSearchParams<{ 
+    id: string,
+    companyName?: string,
+    jobTitle?: string, 
+    location?: string
+  }>();
+  
+  const { id, companyName, jobTitle, location } = params;
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   
@@ -52,18 +60,44 @@ export default function ApplyJobScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
+  // For jobs coming from notifications, we might already have some details
   useEffect(() => {
+    // If we have notification data, create a basic job object while real data loads
+    if (id && jobTitle && companyName) {
+      const placeholderJob: Job = {
+        id: id,
+        title: jobTitle,
+        company: companyName,
+        location: location || 'Loading...',
+        type: '',
+        salary: '',
+        postedDate: new Date().toISOString(),
+      };
+      
+      // Set placeholder job while loading real data
+      setJob(placeholderJob);
+    }
+    
+    // Always fetch full job details
     fetchJobInfo();
-  }, [id]);
+  }, [id, jobTitle, companyName]);
 
   // Function to fetch job details
   const fetchJobInfo = async () => {
+    if (!id) return;
+    
     setIsLoading(true);
     setError(null);
 
     try {
-      // Use the context method to get the job details from cache if available
-      const jobData = await getJobById(id as string);
+      // Try to get job from context first (cache)
+      let jobData = await getJobById(id);
+      
+      // If not in context, fetch directly from API
+      if (!jobData) {
+        console.log("Job not found in context, fetching from API directly");
+        jobData = await fetchJobById(id);
+      }
       
       if (!jobData) {
         throw new Error('Job not found');
@@ -72,10 +106,14 @@ export default function ApplyJobScreen() {
       setJob(jobData);
     } catch (error) {
       console.error('Error fetching job info:', error);
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Failed to load job information. Please try again.');
+      
+      // Don't show error if we have basic job info from notification params
+      if (!(jobTitle && companyName)) {
+        if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError('Failed to load job information. Please try again.');
+        }
       }
     } finally {
       setIsLoading(false);
@@ -194,7 +232,7 @@ export default function ApplyJobScreen() {
           </View>
           <Text style={[styles.successTitle, { color: colors.text }]}>Thank You!</Text>
           <Text style={[styles.successText, { color: colors.icon }]}>
-            {`You will now receive notifications about "${job?.title || ''}" at ${job?.company || ''} and similar opportunities. Good luck with your job search!`}
+            {`You will now receive notifications about "${job?.title || jobTitle || ''}" at ${job?.company || companyName || ''} and similar opportunities. Good luck with your job search!`}
           </Text>
           <TouchableOpacity
             style={[styles.doneButton, { backgroundColor: colors.tint }]}

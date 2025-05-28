@@ -2,23 +2,30 @@
   "expo": {
     "name": "Job Finder",
     "slug": "jobfinder-mobile",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": 
-        "#ffffff"
+        "backgroundColor": "#ffffff"
       },
+      "googleServicesFile": "./google-services.json",
       "package": "com.anonymous.jobfindermobile",
-      "googleServicesFile": "./google-services.json"
+      "permissions": [
+        "com.google.android.gms.permission.AD_ID"
+      ],
+      "versionCode": 5,
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResources": true,
+      "enableR8": true
     },
     "web": {
       "bundler": "metro",
@@ -34,6 +41,13 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-sqlite",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-9773068853653447~1012171054"
         }
       ]
     ],
